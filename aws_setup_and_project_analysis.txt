@@ -1,0 +1,363 @@
+================================================================================
+          GREENCLOUD AI - PROJECT ANALYSIS & AWS SETUP GUIDE FROM SCRATCH
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. Executive Summary & Project Architecture Analysis
+2. Comprehensive Credentials Audit (Existing vs. Missing)
+3. AWS Resources Inventory (What Needs to Be Created in AWS Console)
+4. Complete Step-by-Step AWS Setup Guide (From Scratch)
+5. Infrastructure as Code (IaC) via Terraform
+6. Code Integration: Transitioning from Mock AWS Provider to Boto3 (Real AWS)
+7. Local & Cloud Execution Instructions
+
+================================================================================
+1. EXECUTIVE SUMMARY & PROJECT ARCHITECTURE ANALYSIS
+================================================================================
+
+GreenCloud AI is an AI-powered Sustainable Cloud Optimization & Carbon-Aware 
+Workload Management Platform. It continuously analyzes cloud telemetry, predicts 
+workload demand using Machine Learning, enforces safety policies, generates cost/carbon 
+saving recommendations, and executes closed-loop actions with automated rollback checks.
+
+PROJECT DIRECTORY STRUCTURE & COMPONENT ANALYSIS:
+--------------------------------------------------
+GreenCloud/
+├── backend/                       # Python 3.14 + FastAPI REST API Engine
+│   ├── app/
+│   │   ├── api/                   # API Routers (resources, metrics, recommendations,
+│   │   │                          # predictions, carbon, green-score, cost, audit, scheduler)
+│   │   ├── models/                # SQLAlchemy DB Data Models (User, CloudResource, Metric,
+│   │   │                          # Recommendation, Action, CarbonData, AuditLog)
+│   │   ├── schemas/               # Pydantic Schemas for Request/Response validation
+│   │   ├── services/
+│   │   │   ├── action_executor.py # Closed-loop action execution & automated rollback verifier
+│   │   │   ├── green_score_calc.py# Composite Green Score calculation engine (0-100)
+│   │   │   ├── mock_provider.py   # Abstract Base Cloud Provider & AWS Mock Simulator
+│   │   │   ├── optimizer.py       # Optimization rule scanner & recommendation generator
+│   │   │   └── safety_rules.py    # Risk assessment engine (Low vs High risk policy)
+│   │   ├── config.py              # Application settings, thresholds, and weights
+│   │   ├── database.py            # SQLAlchemy database engine connection
+│   │   └── main.py                # FastAPI application entry point
+│   ├── greencloud.db              # SQLite Database (seeded with 35 days telemetry)
+│   ├── requirements.txt           # Python dependencies (fastapi, uvicorn, sqlalchemy, etc.)
+│   ├── seed_db.py                 # Seeding script for users, resources, metrics & recs
+│   ├── test_pipeline.py           # End-to-end 11-step pipeline verification test
+│   ├── run.bat / run.ps1          # Server launch scripts for Windows
+│   └── .venv/                     # Python virtual environment
+├── frontend/                      # Next.js 14 + React + TypeScript + Tailwind CSS
+│   ├── app/                       # App Router Pages (Overview, Resources, Recommendations,
+│   │                              # Carbon Scheduler, Audit Timeline, Settings)
+│   ├── components/                # Reusable UI components (Navbar, Sidebar, Charts, Cards)
+│   ├── lib/                       # API client utilities & data formatters
+│   └── package.json               # Node.js dependencies
+├── ml/                            # Machine Learning Workload Forecasting Engine
+│   ├── synthetic_generator.py     # 35-day hourly telemetry data generator
+│   ├── train.py                   # Random Forest / XGBoost model training script
+│   ├── predictor.py               # Workload demand inference engine wrapper
+│   └── model.joblib               # Pre-trained ML model artifact
+├── infra/                         # Infrastructure as Code (IaC) Terraform Stubs
+│   ├── main.tf                    # AWS Provider & Terraform settings
+│   ├── variables.tf               # Region and environment variables
+│   ├── vpc.tf                     # AWS VPC & Subnet definitions
+│   ├── iam.tf                     # IAM Roles & Least-Privilege Policy definitions
+│   └── cloudwatch.tf              # CloudWatch Alarm definitions
+├── docs/                          # Architecture & ER Data Model documentation
+├── docker-compose.yml             # Unified Docker Compose orchestration manifest
+└── task.md / implementation_plan.md# Task tracking & design specs
+
+================================================================================
+2. COMPREHENSIVE CREDENTIALS AUDIT (EXISTING VS. MISSING)
+================================================================================
+
+CURRENT STATE:
+--------------
+The project is currently configured to run in SIMULATED / MOCK mode locally using 
+`mock_provider.py` and a local SQLite database (`greencloud.db`). No cloud credentials 
+are strictly required for local demonstration.
+
+REQUIRED CREDENTIALS & ENVIRONMENT VARIABLES FOR PRODUCTION AWS DEPLOYMENT:
+----------------------------------------------------------------------------
+To connect GreenCloud AI to a live AWS Cloud infrastructure, the following credentials 
+and environment variables must be configured in `backend/.env` and `frontend/.env.local`:
+
+[BACKEND ENV VARIABLES - backend/.env]
+1. AWS_ACCESS_KEY_ID
+   - Description: AWS Access Key ID for an IAM User or Service Account.
+   - Required for: Boto3 authentication to fetch CloudWatch metrics and modify EC2/RDS/S3/Lambda.
+   - Status: MISSING (Currently using MockAWSCloudProvider).
+
+2. AWS_SECRET_ACCESS_KEY
+   - Description: AWS Secret Access Key.
+   - Required for: Boto3 API request signing.
+   - Status: MISSING.
+
+3. AWS_DEFAULT_REGION
+   - Description: Primary AWS deployment region (e.g., us-east-1, eu-west-1, ap-southeast-1).
+   - Status: MISSING (Defaults to 'us-east-1' in code).
+
+4. AWS_ROLE_ARN (Optional for cross-account / STS assume role)
+   - Description: ARN of `GreenCloudAutomationExecutorRole`.
+   - Required for: Assuming IAM execution role securely.
+   - Status: MISSING.
+
+5. DATABASE_URL
+   - Description: PostgreSQL connection string for production database.
+   - Example: postgresql://greencloud_user:SecretPassword123!@greencloud-db.c123456789.us-east-1.rds.amazonaws.com:5432/greencloud
+   - Status: OPTIONAL (Currently falls back to local `sqlite:///./greencloud.db`).
+
+6. ELECTRICITY_MAPS_API_KEY or WATTTIME_API_KEY (Optional)
+   - Description: API key for live regional carbon grid intensity lookup.
+   - Status: OPTIONAL (Currently seeded with static carbon intensity data per region).
+
+[FRONTEND ENV VARIABLES - frontend/.env.local]
+1. NEXT_PUBLIC_API_URL
+   - Description: Base HTTP endpoint for backend FastAPI server.
+   - Default: http://localhost:8000/api (or production domain http://<backend-domain>:8000/api).
+   - Status: PRESENT in docker-compose.yml / default config.
+
+================================================================================
+3. AWS RESOURCES INVENTORY (WHAT NEEDS TO BE CREATED IN AWS CONSOLE)
+================================================================================
+
+To mirror the workloads scanned and optimized by GreenCloud AI, you need to create 
+the following AWS resources in your AWS Management Console:
+
+A. NETWORKING & GOVERNANCE
+   1. AWS VPC (`greencloud-vpc`):
+      - IPv4 CIDR: 10.0.0.0/16
+   2. Subnets:
+      - Public Subnet 1: 10.0.1.0/24 (us-east-1a)
+      - Public Subnet 2: 10.0.2.0/24 (us-east-1b)
+      - Private Subnet 1: 10.0.10.0/24 (us-east-1a)
+   3. Internet Gateway & Route Tables:
+      - Internet Gateway attached to VPC for public access.
+   4. Security Groups:
+      - `greencloud-backend-sg`: Inbound TCP 8000 (API), SSH 22.
+      - `greencloud-frontend-sg`: Inbound TCP 3000 / 80 / 443.
+      - `greencloud-rds-sg`: Inbound TCP 5432 from `greencloud-backend-sg`.
+
+B. IAM ROLES & POLICIES
+   1. IAM Policy: `GreenCloudLeastPrivilegeOptimizationPolicy`
+   2. IAM Role: `GreenCloudAutomationExecutorRole`
+   3. IAM User: `greencloud-app-user` (Programmatic Access Key & Secret)
+
+C. TARGET AWS WORKLOADS TO MONITOR & OPTIMIZE
+   1. Amazon EC2 Instances:
+      - Instance 1: `prod-web-frontend-01` (Type: t3.xlarge) -> Candidate for rightsizing to t3.medium.
+      - Instance 2: `dev-api-backend-02` (Type: t3.xlarge) -> Candidate for rightsizing to t3.medium.
+      - Instance 3: `staging-worker-cluster` (Type: c5.2xlarge) -> Candidate for rightsizing to c5.large.
+      - Instance 4: `legacy-batch-runner` (Type: t3.medium, low CPU) -> Candidate for Stop Idle.
+   2. Amazon RDS Database Instance:
+      - Instance Name: `staging-db-replica` (Type: db.r5.xlarge) -> Candidate for rightsizing to db.r5.large.
+   3. Amazon S3 Storage Bucket:
+      - Bucket Name: `prod-raw-access-logs` (Standard S3 Class) -> Candidate for Glacier Instant Retrieval Lifecycle Rule.
+   4. AWS Lambda Function:
+      - Function Name: `analytics-aggregator-fn` (Provisioned Concurrency: 50) -> Candidate for scaling down to 10 units.
+
+D. CLOUDWATCH ALARMS & METRICS
+   1. CloudWatch Metric Alarm: `greencloud-ec2-underutilized-cpu`
+      - Metric: CPUUtilization (Namespace: AWS/EC2)
+      - Period: 3600 seconds (1 hour)
+      - Threshold: < 15.0%
+
+================================================================================
+4. COMPLETE STEP-BY-STEP AWS SETUP GUIDE (FROM SCRATCH)
+================================================================================
+
+STEP 1: LOG IN & SET UP IAM CREDENTIALS
+---------------------------------------
+1. Log in to your AWS Management Console (https://console.aws.amazon.com/).
+2. Navigate to IAM (Identity and Access Management).
+3. Create Policy:
+   a. Click Policies -> Create Policy -> JSON tab.
+   b. Paste the following JSON policy:
+      {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "cloudwatch:GetMetricData",
+              "cloudwatch:GetMetricStatistics",
+              "cloudwatch:ListMetrics",
+              "ec2:DescribeInstances",
+              "ec2:ModifyInstanceAttribute",
+              "ec2:StopInstances",
+              "ec2:StartInstances",
+              "rds:DescribeDBInstances",
+              "rds:ModifyDBInstance",
+              "s3:GetBucketLifecycleConfiguration",
+              "s3:PutLifecycleConfiguration",
+              "lambda:GetFunctionConfiguration",
+              "lambda:UpdateFunctionConfiguration"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+   c. Name the policy: `GreenCloudLeastPrivilegeOptimizationPolicy`. Click Create Policy.
+4. Create IAM User:
+   a. Click Users -> Add User.
+   b. Name: `greencloud-app-user`. Select "Programmatic Access / Access Key".
+   c. Attach policies directly: Attach `GreenCloudLeastPrivilegeOptimizationPolicy`.
+   d. Complete creation, click Create Access Key -> Select Command Line Interface (CLI).
+   e. Copy the generated `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` safely.
+
+STEP 2: NETWORKING SETUP (VPC & SECURITY GROUPS)
+-------------------------------------------------
+1. Navigate to VPC Service in AWS Console.
+2. Click Create VPC -> Choose "VPC and more".
+3. Name: `greencloud-vpc`, CIDR: `10.0.0.0/16`.
+4. Number of Availability Zones: 2.
+5. Create 2 Public Subnets (`10.0.1.0/24`, `10.0.2.0/24`).
+6. Enable DNS Hostnames and DNS Support.
+7. Under Security Groups -> Create Security Group:
+   - Name: `greencloud-backend-sg`
+   - VPC: `greencloud-vpc`
+   - Inbound Rules:
+     - Type: Custom TCP | Port: 8000 | Source: Any-IPv4 (0.0.0.0/0)
+     - Type: SSH | Port: 22 | Source: My IP
+
+STEP 3: LAUNCH TARGET AWS RESOURCES
+-----------------------------------
+1. Launch Target EC2 Instances:
+   a. Navigate to EC2 -> Instances -> Launch Instances.
+   b. Create 3 EC2 Instances:
+      - Name: `prod-web-frontend-01` | Instance Type: `t3.xlarge` | OS: Amazon Linux 2023
+      - Name: `staging-worker-cluster` | Instance Type: `c5.2xlarge` | OS: Amazon Linux 2023
+      - Name: `legacy-batch-runner` | Instance Type: `t3.medium` | OS: Amazon Linux 2023
+   c. Network Settings: Select `greencloud-vpc` and Public Subnet 1.
+2. Launch Target RDS Database Instance:
+   a. Navigate to RDS -> Databases -> Create Database.
+   b. Engine: PostgreSQL. Template: Dev/Test.
+   c. DB Instance Identifier: `staging-db-replica`.
+   d. Instance Class: db.r5.xlarge.
+   e. Connectivity: VPC `greencloud-vpc`, Security Group `greencloud-backend-sg`.
+3. Create Target S3 Bucket:
+   a. Navigate to S3 -> Create Bucket.
+   b. Bucket Name: `prod-raw-access-logs-<your-account-id>` (Region: us-east-1).
+   c. Keep default settings (Block all public access enabled).
+4. Create Target AWS Lambda Function:
+   a. Navigate to Lambda -> Functions -> Create Function.
+   b. Function Name: `analytics-aggregator-fn` | Runtime: Python 3.11.
+   c. Under Configuration -> Provisioned Concurrency -> Set concurrency to 50.
+
+STEP 4: SET UP CLOUDWATCH ALARMS
+--------------------------------
+1. Navigate to CloudWatch -> Alarms -> Create Alarm.
+2. Select Metric -> EC2 -> Per-Instance Metrics -> Choose CPUUtilization for `prod-web-frontend-01`.
+3. Conditions: Threshold type: Static | Whenever CPUUtilization is Lower than 15.
+4. Period: 1 hour | Evaluation Periods: 168 (7 days).
+5. Alarm Name: `greencloud-ec2-underutilized-cpu`.
+
+================================================================================
+5. INFRASTRUCTURE AS CODE (IaC) VIA TERRAFORM
+================================================================================
+
+Instead of creating resources manually via the console, you can automatically 
+provision the core infrastructure using Terraform in the `infra/` folder:
+
+1. Install Terraform (https://developer.hashicorp.com/terraform/downloads).
+2. Configure AWS credentials in your terminal:
+   $env:AWS_ACCESS_KEY_ID="your_access_key_id"
+   $env:AWS_SECRET_ACCESS_KEY="your_secret_access_key"
+   $env:AWS_DEFAULT_REGION="us-east-1"
+3. Run Terraform Commands:
+   cd infra
+   terraform init
+   terraform plan
+   terraform apply -auto-approve
+
+This provisions:
+- AWS VPC & Subnets (`infra/vpc.tf`)
+- IAM Automation Role & Least-Privilege Policy (`infra/iam.tf`)
+- CloudWatch Underutilized Alarm (`infra/cloudwatch.tf`)
+
+================================================================================
+6. CODE INTEGRATION: TRANSITIONING FROM MOCK AWS PROVIDER TO BOTO3
+================================================================================
+
+Currently, `backend/app/services/mock_provider.py` simulates AWS API calls. 
+To execute real actions against your AWS Cloud resources, update `mock_provider.py` 
+or swap it with a Boto3 Cloud Provider implementation as shown below:
+
+```python
+import boto3
+from typing import Dict, Any
+from datetime import datetime
+from app.services.mock_provider import BaseCloudProvider
+
+class RealAWSBoto3Provider(BaseCloudProvider):
+    def __init__(self, region_name: str = "us-east-1"):
+        self.ec2 = boto3.client("ec2", region_name=region_name)
+        self.rds = boto3.client("rds", region_name=region_name)
+        self.s3 = boto3.client("s3", region_name=region_name)
+        self.cw = boto3.client("cloudwatch", region_name=region_name)
+
+    def get_resource(self, resource_id: str) -> Dict[str, Any]:
+        if resource_id.startswith("i-"):
+            res = self.ec2.describe_instances(InstanceIds=[resource_id])
+            inst = res["Reservations"][0]["Instances"][0]
+            return {"resource_id": resource_id, "status": inst["State"]["Name"], "type": inst["InstanceType"]}
+        return {"resource_id": resource_id, "status": "online"}
+
+    def execute_resize(self, resource_id: str, new_target_spec: str) -> Dict[str, Any]:
+        if resource_id.startswith("i-"):
+            # EC2 Rightsizing
+            self.ec2.stop_instances(InstanceIds=[resource_id])
+            waiter = self.ec2.get_waiter('instance_stopped')
+            waiter.wait(InstanceIds=[resource_id])
+            self.ec2.modify_instance_attribute(InstanceId=resource_id, InstanceType={'Value': new_target_spec})
+            self.ec2.start_instances(InstanceIds=[resource_id])
+            return {"success": True, "message": f"Successfully resized EC2 {resource_id} to {new_target_spec}"}
+        elif "db" in resource_id:
+            # RDS Rightsizing
+            self.rds.modify_db_instance(DBInstanceIdentifier=resource_id, DBInstanceClass=new_target_spec, ApplyImmediately=True)
+            return {"success": True, "message": f"Successfully resized RDS {resource_id} to {new_target_spec}"}
+
+    def execute_stop(self, resource_id: str) -> Dict[str, Any]:
+        self.ec2.stop_instances(InstanceIds=[resource_id])
+        return {"success": True, "message": f"Stopped idle instance {resource_id}"}
+```
+
+================================================================================
+7. LOCAL & CLOUD EXECUTION INSTRUCTIONS
+================================================================================
+
+A. RUNNING LOCALLY (DEVELOPMENT / DEMO MODE):
+--------------------------------------------
+1. Navigate to backend directory:
+   cd backend
+2. Activate Virtual Environment & Install Dependencies:
+   .\.venv\Scripts\activate
+   pip install -r requirements.txt
+3. Seed Local Database:
+   python seed_db.py
+4. Start FastAPI Backend:
+   python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+5. Start Next.js Frontend (in a new terminal window):
+   cd frontend
+   npm run dev
+6. Open Browser:
+   - Dashboard: http://localhost:3000
+   - FastAPI Docs: http://127.0.0.1:8000/docs
+
+B. RUNNING END-TO-END PIPELINE VERIFICATION TEST:
+-------------------------------------------------
+While the backend server is running, execute:
+   cd backend
+   python test_pipeline.py
+
+This runs an automated 11-step verification suite checking:
+- Resource telemetry ingestion & scoring
+- ML demand forecasting
+- Recommendation generation (6 rules)
+- IAM Role permission checks
+- AWS Action simulation & automated rollback verification
+- Carbon-Aware workload scheduling recommendations
+
+================================================================================
+                 END OF GREENCLOUD AI AWS SETUP & ANALYSIS GUIDE
+================================================================================
