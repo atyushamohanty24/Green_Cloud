@@ -58,3 +58,15 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Certificates & Keys
+*.pem
+*.key
+*.cert
+

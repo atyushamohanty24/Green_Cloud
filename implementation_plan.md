@@ -271,13 +271,13 @@ erDiagram
 ## 6. Execution Milestones & Task Checklist
 
 - [x] **Milestone 1**: Project Structure & Architecture Docs
-- [ ] **Milestone 2**: Synthetic Data Generator & ML Training Pipeline
-- [ ] **Milestone 3**: FastAPI Backend Development (Models, Routers, Optimizer, Safety Rules)
-- [ ] **Milestone 4**: Next.js Frontend Development (Theme, Components, Dashboard Pages)
-- [ ] **Milestone 5**: Carbon Scheduler, Audit Log & Settings Features
-- [ ] **Milestone 6**: Infrastructure Terraform Stubs & Docker Compose Setup
-- [ ] **Milestone 7**: Visual Polish, Browser Subagent Click-Through Verification & Screenshots
-- [ ] **Milestone 8**: Produce Walkthrough Artifact (`walkthrough.md`)
+- [x] **Milestone 2**: Synthetic Data Generator & ML Training Pipeline
+- [x] **Milestone 3**: FastAPI Backend Development (Models, Routers, Optimizer, Safety Rules)
+- [x] **Milestone 4**: Next.js Frontend Development (Theme, Components, Dashboard Pages)
+- [x] **Milestone 5**: Carbon Scheduler, Audit Log & Settings Features
+- [x] **Milestone 6**: Infrastructure Terraform Stubs & Docker Compose Setup
+- [x] **Milestone 7**: Visual Polish, Browser Subagent Click-Through Verification & Screenshots
+- [x] **Milestone 8**: Produce Walkthrough Artifact (`walkthrough.md`)
 
 ---
 
