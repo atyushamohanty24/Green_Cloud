@@ -1,0 +1,17 @@
+[Unit]
+Description=GreenCloud AI FastAPI Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/opt/greencloud/backend
+Environment="PATH=/opt/greencloud/backend/.venv/bin:/usr/local/bin:/usr/bin"
+Environment="PYTHONPATH=/opt/greencloud:/opt/greencloud/backend"
+ExecStart=/opt/greencloud/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

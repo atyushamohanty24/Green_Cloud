@@ -60,7 +60,7 @@ GreenCloud AI is an enterprise-grade platform combining **FinOps** (Cloud Cost O
 - **Backend**: Python 3.10+, FastAPI, Uvicorn, SQLAlchemy, Pydantic, Boto3, Python-Dotenv
 - **Machine Learning**: Scikit-Learn (Random Forest), XGBoost, Pandas, NumPy, Joblib
 - **Cloud Infrastructure**: Amazon Web Services (AWS) — VPC, EC2, S3 Glacier, Lambda, CloudWatch, IAM
-- **Infrastructure as Code**: Terraform Stubs (`infra/`)
+- **Reverse Proxy & Containers**: Docker, Docker Compose, Nginx (gzip, SSL-ready, auto-proxying)
 
 ---
 
@@ -69,35 +69,59 @@ GreenCloud AI is an enterprise-grade platform combining **FinOps** (Cloud Cost O
 ```
 GreenCloud/
 ├── backend/                       # Python FastAPI Backend
-│   ├── app/
-│   │   ├── api/                   # REST API Routers (/resources, /recommendations, /carbon, etc.)
-│   │   ├── models/                # SQLAlchemy Models
-│   │   ├── schemas/               # Pydantic Schemas
-│   │   ├── services/              # Optimizer, Safety Rules, Action Executor, Mock/Live Provider
-│   │   ├── config.py              # Application Configuration & Settings
-│   │   ├── database.py            # Database Session & Engine
-│   │   └── main.py                # FastAPI Entrypoint
+│   ├── app/                       # REST API Routers, Models, Schemas, Services
+│   ├── Dockerfile                 # Backend Containerization
+│   ├── entrypoint.sh              # Auto-seeding & Uvicorn ASGI Runner
 │   ├── seed_db.py                 # Telemetry & Resource Seeding Script
-│   ├── test_pipeline.py           # 11-Step Automated End-to-End Pipeline Verification Test
+│   ├── test_pipeline.py           # 11-Step Automated Verification Test
 │   └── requirements.txt           # Python Dependencies
 ├── frontend/                      # Next.js 14 Web Dashboard
 │   ├── app/                       # Dashboard Pages (Overview, Resources, Recommendations, Carbon, Audit)
 │   ├── components/                # Reusable UI Components
+│   ├── next.config.mjs            # Standalone output & internal API rewrites
+│   ├── Dockerfile                 # Multi-Stage Optimized Docker Build
 │   └── package.json               # Node.js Dependencies
+├── nginx/                         # Nginx Production Reverse Proxy
+│   └── nginx.conf                 # Unified port 80 routing (/ -> Frontend, /api -> Backend)
 ├── ml/                            # Machine Learning Engine
 │   ├── synthetic_generator.py     # 35-Day Hourly Telemetry Generator
 │   ├── train.py                   # Random Forest Model Training Script
 │   ├── predictor.py               # 24h Workload Inference Wrapper
 │   └── model.joblib               # Pre-trained ML Model Artifact
-├── infra/                         # Terraform Infrastructure Definitions
-│   ├── main.tf                    # AWS Provider Setup
-│   ├── vpc.tf                     # Custom VPC & Subnets
-│   ├── iam.tf                     # Least-Privilege IAM Policy & Execution Role
-│   └── cloudwatch.tf              # CloudWatch Metric Alarms
+├── scripts/                       # Deployment & Bootstrap Automation
+│   ├── ec2-setup.sh               # 1-Command Automated EC2 Provisioner & Runner
+│   └── deploy.sh                  # Quick Zero-Downtime Redeployer
+├── deploy/                        # Native Systemd Services & Configs
+│   ├── systemd/                   # Backend & Frontend systemd unit files
+│   └── nginx/                     # System Nginx virtual host config
+├── docker-compose.yml             # Orchestrates Backend, Frontend, and Nginx
+├── EC2_DEPLOYMENT_GUIDE.md        # Comprehensive AWS EC2 Step-by-Step Guide
 ├── HOW_TO_TEST_AND_EXPLAIN_PROJECT.txt # Comprehensive Testing & Viva Presentation Guide
 ├── .env.example                   # Sanitized Environment Configuration Template
 └── README.md                      # Project Documentation
 ```
+
+---
+
+## ☁️ AWS EC2 Deployment (Quick Start)
+
+Deploy the entire GreenCloud AI platform to an AWS EC2 instance in minutes:
+
+### 1-Command Bootstrap on Any EC2 Instance (Amazon Linux 2023 or Ubuntu)
+SSH into your EC2 instance and run:
+```bash
+curl -fsSL https://raw.githubusercontent.com/atyushamohanty24/Green_Cloud/main/scripts/ec2-setup.sh | bash
+```
+
+### Or Deploy Manually via Docker Compose
+```bash
+git clone https://github.com/atyushamohanty24/Green_Cloud.git
+cd Green_Cloud
+cp .env.example .env
+docker compose up -d --build
+```
+
+📖 **Detailed instructions, architecture diagrams, and security group configs are available in [EC2_DEPLOYMENT_GUIDE.md](EC2_DEPLOYMENT_GUIDE.md).**
 
 ---
 

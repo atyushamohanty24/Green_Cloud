@@ -45,6 +45,15 @@ def root():
         "api_v1": settings.API_V1_STR
     }
 
+@app.get("/health")
+@app.get(f"{settings.API_V1_STR}/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "system": settings.PROJECT_NAME,
+        "version": "1.0.0"
+    }
+
 @app.post("/api/simulation/rollback/{action_id}")
 def trigger_simulated_rollback(action_id: int, reason: str = "Simulated high CPU post-action regression", db: Session = Depends(get_db)):
     success, message = action_executor.rollback_action(db, action_id=action_id, reason=reason)
